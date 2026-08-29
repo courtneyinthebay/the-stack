@@ -397,7 +397,7 @@ const GENRE_TONE = {
 
 const DOWNLOAD_PASSWORD = 'HenryHenryHenry!!!';
 
-function downloadMyData(){
+async function downloadMyData(){
   const input = document.getElementById('downloadPassword');
   const errorEl = document.getElementById('downloadError');
   if(input.value !== DOWNLOAD_PASSWORD){
@@ -406,11 +406,31 @@ function downloadMyData(){
   }
   errorEl.textContent = '';
   const backup = {exportedAt: new Date().toISOString(), STATE, CATALOG, PLAN};
-  const blob = new Blob([JSON.stringify(backup, null, 2)], {type: 'application/json'});
+  const json = JSON.stringify(backup, null, 2);
+  const filename = 'the-stack-backup-' + new Date().toISOString().slice(0,10) + '.json';
+
+  // A plain <a download> link is inert inside the claude.ai artifact viewer --
+  // downloads only reach the viewer through this capability, which shows them
+  // a real confirmation prompt. Falls back to a normal browser download when
+  // the capability isn't there at all (e.g. once this page is loaded straight
+  // from GitHub, where window.claude doesn't exist).
+  try{
+    const downloads = (typeof window !== 'undefined' && window.claude && window.claude.use)
+      ? await window.claude.use('downloads') : null;
+    if(downloads){
+      await downloads.save({filename, data: json});
+      input.value = '';
+      return;
+    }
+  }catch(e){
+    if(e && e.code === 'declined') return; // she said no in the prompt -- don't fall back behind her back
+  }
+
+  const blob = new Blob([json], {type: 'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'the-stack-backup-' + new Date().toISOString().slice(0,10) + '.json';
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   a.remove();
