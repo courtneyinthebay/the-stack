@@ -642,16 +642,39 @@ function addBook(title, author, genre, buzz, wishlist){
   return {ok: true, book};
 }
 
+// For a book picked up and finished off-shelf that was never part of the
+// plan/picker catalog at all -- adds it (if it isn't already catalogued)
+// and marks it read in one step, same as checking it off in Browse would,
+// so it immediately shows up in "Rate what you just finished." If it's
+// already in the catalog, reuses that entry's own genre rather than
+// overwriting it with whatever this form's dropdown happened to be set to.
+function addAlreadyReadBook(title, author, genre){
+  const key = title.toLowerCase() + '||' + author.toLowerCase();
+  let book = CATALOG_BY_KEY[key];
+  if(book){
+    if(STATE.read[key]) return {ok: false, error: 'That book is already marked as read.'};
+  } else {
+    const tone = GENRE_TONE[genre];
+    book = {k: key, t: title, a: author, g: genre, tone, tier: 'Solid Pick', buzz: 'medium', score: 50};
+    CATALOG.push(book);
+    CATALOG_BY_KEY[key] = book;
+  }
+  markRead(key);
+  return {ok: true, book};
+}
+
 function submitAddBook(){
   const title = document.getElementById('newBookTitle').value.trim();
   const author = document.getElementById('newBookAuthor').value.trim();
   const genre = document.getElementById('newBookGenre').value;
   const buzz = document.getElementById('newBookBuzz').value;
   const ownEl = document.querySelector('input[name="newBookOwn"]:checked');
-  const wishlist = !!ownEl && ownEl.value === 'wishlist';
+  const mode = ownEl ? ownEl.value : 'owned';
   const errorEl = document.getElementById('addBookError');
   if(!title || !author){ errorEl.textContent = 'Title and author are both required.'; return; }
-  const result = addBook(title, author, genre, buzz, wishlist);
+  const result = mode === 'read'
+    ? addAlreadyReadBook(title, author, genre)
+    : addBook(title, author, genre, buzz, mode === 'wishlist');
   if(!result.ok){ errorEl.textContent = result.error; return; }
 }
 
@@ -1131,6 +1154,7 @@ function renderOverview(){
       <div class="add-book-radio">
         <label><input type="radio" name="newBookOwn" value="owned" checked> I own this</label>
         <label><input type="radio" name="newBookOwn" value="wishlist"> On my wishlist &mdash; don't have it yet</label>
+        <label><input type="radio" name="newBookOwn" value="read"> Already read it &mdash; wasn't on the plan</label>
       </div>
       <div class="add-book-actions">
         <button class="btn primary small" onclick="submitAddBook()">Add book</button>
@@ -1974,7 +1998,7 @@ function initSeedAndTabs(){
   renderAll();
 }
 
-const FUNCTIONS_TO_SERIALIZE = [tierClass, effectivePlan, currentMonthPlan, allPlannedKeys, persistState, flashSave, fireConfetti, markRead, unmarkRead, rateBook, unrateBook, skipRating, needsRating, ratingResolved, needsFeedback, setToneFit, setMoreLikeThis, skipFeedback, feedbackPromptHTML, feedbackWeight, starRatingHTML, ratingPromptHTML, skipBook, unskipBook, markReading, unmarkReading, markDNF, unmarkDNF, startProgressEdit, cancelProgressEdit, saveProgress, initialsOf, ensureCoverLoaded, addToPlan, findReplacement, removeFromPlan, addNextMonth, bookTagsHTML, whyChosenText, similarBooksHTML, whyPickHTML, toggleWhyPanel, checkGatePassphrase, gatePassphraseKeydown, gaugeNeedleColor, renderGaugeSVG, winePairingFor, winePairingReason, monthCardHTML, renderOverview, renderPlan, pickerPool, surpriseMe, renderPicker, renderBrowse, lastNameOf, renderBrowseBody, downloadMyData, addBook, submitAddBook, buyWishlistBook, renderHowItWorks, recomputeLiveCatalog, liveScore, liveTier, renderAll, escHtml, escKey, buildPageHtml, initSeedAndTabs, reportColor, pct, round1, monthLabel, hBarChart, funnelChart, sparkBars, reportSection, computeReportData, renderReport];
+const FUNCTIONS_TO_SERIALIZE = [tierClass, effectivePlan, currentMonthPlan, allPlannedKeys, persistState, flashSave, fireConfetti, markRead, unmarkRead, rateBook, unrateBook, skipRating, needsRating, ratingResolved, needsFeedback, setToneFit, setMoreLikeThis, skipFeedback, feedbackPromptHTML, feedbackWeight, starRatingHTML, ratingPromptHTML, skipBook, unskipBook, markReading, unmarkReading, markDNF, unmarkDNF, startProgressEdit, cancelProgressEdit, saveProgress, initialsOf, ensureCoverLoaded, addToPlan, findReplacement, removeFromPlan, addNextMonth, bookTagsHTML, whyChosenText, similarBooksHTML, whyPickHTML, toggleWhyPanel, checkGatePassphrase, gatePassphraseKeydown, gaugeNeedleColor, renderGaugeSVG, winePairingFor, winePairingReason, monthCardHTML, renderOverview, renderPlan, pickerPool, surpriseMe, renderPicker, renderBrowse, lastNameOf, renderBrowseBody, downloadMyData, addBook, addAlreadyReadBook, submitAddBook, buyWishlistBook, renderHowItWorks, recomputeLiveCatalog, liveScore, liveTier, renderAll, escHtml, escKey, buildPageHtml, initSeedAndTabs, reportColor, pct, round1, monthLabel, hBarChart, funnelChart, sparkBars, reportSection, computeReportData, renderReport];
 
 initSeedAndTabs();
 </script>
