@@ -1327,11 +1327,20 @@ function renderBrowse(){
   renderBrowseBody();
 }
 
+// Last "word" of an author's name -- handles "First Last", "First Middle
+// Last", and initials ("K.A. Tucker") well enough for sorting; a hyphenated
+// or accented surname (e.g. "Faridah Àbíké-Íyímídé") stays intact since it's
+// one token. Not perfect for suffixes like "Jr." but good enough for A-Z.
+function lastNameOf(name){
+  const parts = String(name).trim().split(/\s+/);
+  return parts[parts.length - 1] || name;
+}
+
 function renderBrowseBody(){
   let rows = CATALOG.slice();
   const q = browseSearch.trim().toLowerCase();
   if(q) rows = rows.filter(b => b.t.toLowerCase().includes(q) || b.a.toLowerCase().includes(q));
-  const colVal = (b, col) => (col === 'score' || col === 'tier') ? (col === 'score' ? liveScore(b.k) : liveTier(b.k)) : b[col];
+  const colVal = (b, col) => (col === 'score' || col === 'tier') ? (col === 'score' ? liveScore(b.k) : liveTier(b.k)) : col === 'a' ? lastNameOf(b.a) : b[col];
   const isResolved = b => !!STATE.read[b.k] || !!STATE.dnf[b.k];
   rows.sort((x,y) => {
     // Sorting by score is "what should I read next" -- a book you've
@@ -1965,7 +1974,7 @@ function initSeedAndTabs(){
   renderAll();
 }
 
-const FUNCTIONS_TO_SERIALIZE = [tierClass, effectivePlan, currentMonthPlan, allPlannedKeys, persistState, flashSave, fireConfetti, markRead, unmarkRead, rateBook, unrateBook, skipRating, needsRating, ratingResolved, needsFeedback, setToneFit, setMoreLikeThis, skipFeedback, feedbackPromptHTML, feedbackWeight, starRatingHTML, ratingPromptHTML, skipBook, unskipBook, markReading, unmarkReading, markDNF, unmarkDNF, startProgressEdit, cancelProgressEdit, saveProgress, initialsOf, ensureCoverLoaded, addToPlan, findReplacement, removeFromPlan, addNextMonth, bookTagsHTML, whyChosenText, similarBooksHTML, whyPickHTML, toggleWhyPanel, checkGatePassphrase, gatePassphraseKeydown, gaugeNeedleColor, renderGaugeSVG, winePairingFor, winePairingReason, monthCardHTML, renderOverview, renderPlan, pickerPool, surpriseMe, renderPicker, renderBrowse, renderBrowseBody, downloadMyData, addBook, submitAddBook, buyWishlistBook, renderHowItWorks, recomputeLiveCatalog, liveScore, liveTier, renderAll, escHtml, escKey, buildPageHtml, initSeedAndTabs, reportColor, pct, round1, monthLabel, hBarChart, funnelChart, sparkBars, reportSection, computeReportData, renderReport];
+const FUNCTIONS_TO_SERIALIZE = [tierClass, effectivePlan, currentMonthPlan, allPlannedKeys, persistState, flashSave, fireConfetti, markRead, unmarkRead, rateBook, unrateBook, skipRating, needsRating, ratingResolved, needsFeedback, setToneFit, setMoreLikeThis, skipFeedback, feedbackPromptHTML, feedbackWeight, starRatingHTML, ratingPromptHTML, skipBook, unskipBook, markReading, unmarkReading, markDNF, unmarkDNF, startProgressEdit, cancelProgressEdit, saveProgress, initialsOf, ensureCoverLoaded, addToPlan, findReplacement, removeFromPlan, addNextMonth, bookTagsHTML, whyChosenText, similarBooksHTML, whyPickHTML, toggleWhyPanel, checkGatePassphrase, gatePassphraseKeydown, gaugeNeedleColor, renderGaugeSVG, winePairingFor, winePairingReason, monthCardHTML, renderOverview, renderPlan, pickerPool, surpriseMe, renderPicker, renderBrowse, lastNameOf, renderBrowseBody, downloadMyData, addBook, submitAddBook, buyWishlistBook, renderHowItWorks, recomputeLiveCatalog, liveScore, liveTier, renderAll, escHtml, escKey, buildPageHtml, initSeedAndTabs, reportColor, pct, round1, monthLabel, hBarChart, funnelChart, sparkBars, reportSection, computeReportData, renderReport];
 
 initSeedAndTabs();
 </script>
