@@ -348,6 +348,19 @@ function effectivePlan(){
   return months;
 }
 
+// The first month that still has a book needing action (not read, not
+// DNF'd) -- or an empty month, which needs attention too. Falls back to
+// the last month once everything's resolved, so Overview tracks what's
+// actually in progress instead of always pinning to Month 1.
+function currentMonthPlan(){
+  const months = effectivePlan();
+  const active = months.find(m => {
+    const books = m.keys.map(k => CATALOG_BY_KEY[k]).filter(Boolean);
+    return books.length === 0 || books.some(b => !STATE.read[b.k] && !STATE.dnf[b.k]);
+  });
+  return active || months[months.length - 1];
+}
+
 function allPlannedKeys(){
   const s = new Set();
   effectivePlan().forEach(m => m.keys.forEach(k => s.add(k)));
@@ -1128,7 +1141,7 @@ function renderOverview(){
     </div>
 
     <h2 class="eyebrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M3 9h18"></path></svg>This Month's Plan</h2>
-    ${monthCardHTML(effectivePlan()[0])}
+    ${monthCardHTML(currentMonthPlan())}
   `;
 }
 
@@ -1973,7 +1986,7 @@ function initSeedAndTabs(){
   renderAll();
 }
 
-const FUNCTIONS_TO_SERIALIZE = [tierClass, effectivePlan, allPlannedKeys, persistState, flashSave, fireConfetti, markRead, unmarkRead, rateBook, unrateBook, skipRating, needsRating, ratingResolved, needsFeedback, setToneFit, setMoreLikeThis, skipFeedback, feedbackPromptHTML, feedbackWeight, starRatingHTML, ratingPromptHTML, skipBook, unskipBook, markReading, unmarkReading, markDNF, unmarkDNF, startProgressEdit, cancelProgressEdit, saveProgress, initialsOf, ensureCoverLoaded, addToPlan, findReplacement, removeFromPlan, addNextMonth, bookTagsHTML, whyChosenText, similarBooksHTML, whyPickHTML, toggleWhyPanel, checkGatePassphrase, gatePassphraseKeydown, gaugeNeedleColor, renderGaugeSVG, winePairingFor, winePairingReason, monthCardHTML, renderOverview, renderPlan, pickerPool, surpriseMe, renderPicker, renderBrowse, renderBrowseBody, downloadMyData, addBook, submitAddBook, buyWishlistBook, renderPersona, renderHowItWorks, recomputeLiveCatalog, liveScore, liveTier, renderAll, escHtml, escKey, buildPageHtml, initSeedAndTabs, reportColor, pct, round1, monthLabel, hBarChart, funnelChart, sparkBars, reportSection, computeReportData, renderReport];
+const FUNCTIONS_TO_SERIALIZE = [tierClass, effectivePlan, currentMonthPlan, allPlannedKeys, persistState, flashSave, fireConfetti, markRead, unmarkRead, rateBook, unrateBook, skipRating, needsRating, ratingResolved, needsFeedback, setToneFit, setMoreLikeThis, skipFeedback, feedbackPromptHTML, feedbackWeight, starRatingHTML, ratingPromptHTML, skipBook, unskipBook, markReading, unmarkReading, markDNF, unmarkDNF, startProgressEdit, cancelProgressEdit, saveProgress, initialsOf, ensureCoverLoaded, addToPlan, findReplacement, removeFromPlan, addNextMonth, bookTagsHTML, whyChosenText, similarBooksHTML, whyPickHTML, toggleWhyPanel, checkGatePassphrase, gatePassphraseKeydown, gaugeNeedleColor, renderGaugeSVG, winePairingFor, winePairingReason, monthCardHTML, renderOverview, renderPlan, pickerPool, surpriseMe, renderPicker, renderBrowse, renderBrowseBody, downloadMyData, addBook, submitAddBook, buyWishlistBook, renderPersona, renderHowItWorks, recomputeLiveCatalog, liveScore, liveTier, renderAll, escHtml, escKey, buildPageHtml, initSeedAndTabs, reportColor, pct, round1, monthLabel, hBarChart, funnelChart, sparkBars, reportSection, computeReportData, renderReport];
 
 initSeedAndTabs();
 </script>
