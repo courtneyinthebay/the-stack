@@ -670,6 +670,24 @@ function addAlreadyReadBook(title, author, genre){
   return {ok: true, book};
 }
 
+// For a book that isn't in the catalog at all and you already know you
+// want it on the current plan, not just sitting on the general shelf --
+// adds it (if not already catalogued) then queues it via addToPlan() in
+// one step. Unlike "already read it," genre/buzz actually matter here:
+// the book stays in the live scoring pool once it's on the shelf.
+function addNewBookToPlan(title, author, genre, buzz){
+  const key = title.toLowerCase() + '||' + author.toLowerCase();
+  let book = CATALOG_BY_KEY[key];
+  if(!book){
+    const tone = GENRE_TONE[genre];
+    book = {k: key, t: title, a: author, g: genre, tone, tier: 'Solid Pick', buzz, score: 50};
+    CATALOG.push(book);
+    CATALOG_BY_KEY[key] = book;
+  }
+  addToPlan(key);
+  return {ok: true, book};
+}
+
 function submitAddBook(){
   const title = document.getElementById('newBookTitle').value.trim();
   const author = document.getElementById('newBookAuthor').value.trim();
@@ -679,8 +697,8 @@ function submitAddBook(){
   const mode = ownEl ? ownEl.value : 'owned';
   const errorEl = document.getElementById('addBookError');
   if(!title || !author){ errorEl.textContent = 'Title and author are both required.'; return; }
-  const result = mode === 'read'
-    ? addAlreadyReadBook(title, author, genre)
+  const result = mode === 'read' ? addAlreadyReadBook(title, author, genre)
+    : mode === 'plan' ? addNewBookToPlan(title, author, genre, buzz)
     : addBook(title, author, genre, buzz, mode === 'wishlist');
   if(!result.ok){ errorEl.textContent = result.error; return; }
 }
@@ -829,8 +847,7 @@ function ensureCoverLoaded(book){
 }
 
 function addToPlan(key){
-  const months = effectivePlan();
-  const target = months[months.length-1];
+  const target = currentMonthPlan();
   if(!STATE.planOverrides[target.month]) STATE.planOverrides[target.month] = {added:[], removed:[]};
   if(!target.keys.includes(key)) STATE.planOverrides[target.month].added.push(key);
   delete STATE.skipped[key];
@@ -1187,6 +1204,7 @@ function renderOverview(){
         <label><input type="radio" name="newBookOwn" value="owned" checked> I own this</label>
         <label><input type="radio" name="newBookOwn" value="wishlist"> On my wishlist &mdash; don't have it yet</label>
         <label><input type="radio" name="newBookOwn" value="read"> Already read it &mdash; wasn't on the plan</label>
+        <label><input type="radio" name="newBookOwn" value="plan"> Add it to this month's plan</label>
       </div>
       <div class="add-book-actions">
         <button class="btn primary small" onclick="submitAddBook()">Add book</button>
@@ -1410,13 +1428,15 @@ function renderBrowseBody(){
     if(typeof a === 'number') return (a-b) * browseSort.dir;
     return String(a).localeCompare(String(b)) * browseSort.dir;
   });
+  const plannedKeys = allPlannedKeys();
   document.getElementById('browseBody').innerHTML = rows.map(b => {
     const isDone = !!STATE.read[b.k];
     const isSkipped = !!STATE.skipped[b.k];
     const isDnf = !!STATE.dnf[b.k];
     const isReading = !!STATE.reading[b.k];
     const isWishlist = !!STATE.wishlist[b.k];
-    const status = isDone ? '&#10003; read' : isDnf ? 'DNF' : isReading ? 'reading' : isWishlist ? 'wishlist' : isSkipped ? 'skipped' : '&mdash;';
+    const isPlanned = plannedKeys.has(b.k);
+    const status = isDone ? '&#10003; read' : isDnf ? 'DNF' : isReading ? 'reading' : isWishlist ? 'wishlist' : isSkipped ? 'skipped' : isPlanned ? 'on plan' : '&mdash;';
     const tier = liveTier(b.k), score = liveScore(b.k);
     const k = escKey(b.k);
     // Same actions as a plan row, right from the full 351-book list --
@@ -1424,12 +1444,18 @@ function renderBrowseBody(){
     // Currently-reading/finished/DNF'd books get their full workflow
     // (progress, rate, etc.) from Overview once marked here, so this stays
     // to just the one or two actions that matter from a dense table row.
+    // Add to Plan is left out for books that already have it (nothing new
+    // to do -- the "on plan" status above is the confirmation) and for
+    // wishlist books not bought yet, matching the app's existing rule that
+    // an unbought wishlist book stays out of the plan/picker.
+    const addToPlanBtn = (!isDone && !isDnf && !isWishlist && !isPlanned)
+      ? `<button class="btn small" onclick="addToPlan('${k}')">Add to plan</button>` : '';
     const actions = isDone ? `<button class="btn small" onclick="unmarkRead('${k}')">Undo</button>`
       : isDnf ? `<button class="btn small" onclick="unmarkDNF('${k}')">Undo</button>`
       : isReading ? `<button class="btn small" onclick="unmarkReading('${k}')">Stop reading</button>`
       : isWishlist ? `<button class="btn small" onclick="buyWishlistBook('${k}')">Bought it!</button>`
-      : isSkipped ? `<button class="btn small" onclick="unskipBook('${k}')">Unskip</button>`
-      : `<button class="btn small" onclick="markReading('${k}')">Start reading</button><button class="btn small primary" onclick="markRead('${k}')">Mark read</button>`;
+      : isSkipped ? `<button class="btn small" onclick="unskipBook('${k}')">Unskip</button>${addToPlanBtn}`
+      : `<button class="btn small" onclick="markReading('${k}')">Start reading</button><button class="btn small primary" onclick="markRead('${k}')">Mark read</button>${addToPlanBtn}`;
     // Full delete is a separate, always-available action (any status) --
     // takes over the whole actions area with a one-step confirm instead of
     // sitting next to the status actions, so it can't be fat-fingered.
@@ -2050,7 +2076,7 @@ function initSeedAndTabs(){
   renderAll();
 }
 
-const FUNCTIONS_TO_SERIALIZE = [tierClass, effectivePlan, currentMonthPlan, allPlannedKeys, persistState, flashSave, fireConfetti, markRead, unmarkRead, rateBook, unrateBook, skipRating, needsRating, ratingResolved, needsFeedback, setToneFit, setMoreLikeThis, skipFeedback, feedbackPromptHTML, feedbackWeight, starRatingHTML, ratingPromptHTML, skipBook, unskipBook, markReading, unmarkReading, markDNF, unmarkDNF, startProgressEdit, cancelProgressEdit, saveProgress, initialsOf, ensureCoverLoaded, addToPlan, findReplacement, removeFromPlan, addNextMonth, startDeleteBook, cancelDeleteBook, deleteBook, bookTagsHTML, whyChosenText, similarBooksHTML, whyPickHTML, toggleWhyPanel, checkGatePassphrase, gatePassphraseKeydown, gaugeNeedleColor, renderGaugeSVG, winePairingFor, winePairingReason, monthCardHTML, renderOverview, renderPlan, pickerPool, surpriseMe, renderPicker, renderBrowse, lastNameOf, renderBrowseBody, downloadMyData, addBook, addAlreadyReadBook, submitAddBook, buyWishlistBook, renderHowItWorks, recomputeLiveCatalog, liveScore, liveTier, renderAll, escHtml, escKey, buildPageHtml, initSeedAndTabs, reportColor, pct, round1, monthLabel, hBarChart, funnelChart, sparkBars, reportSection, computeReportData, renderReport];
+const FUNCTIONS_TO_SERIALIZE = [tierClass, effectivePlan, currentMonthPlan, allPlannedKeys, persistState, flashSave, fireConfetti, markRead, unmarkRead, rateBook, unrateBook, skipRating, needsRating, ratingResolved, needsFeedback, setToneFit, setMoreLikeThis, skipFeedback, feedbackPromptHTML, feedbackWeight, starRatingHTML, ratingPromptHTML, skipBook, unskipBook, markReading, unmarkReading, markDNF, unmarkDNF, startProgressEdit, cancelProgressEdit, saveProgress, initialsOf, ensureCoverLoaded, addToPlan, findReplacement, removeFromPlan, addNextMonth, startDeleteBook, cancelDeleteBook, deleteBook, bookTagsHTML, whyChosenText, similarBooksHTML, whyPickHTML, toggleWhyPanel, checkGatePassphrase, gatePassphraseKeydown, gaugeNeedleColor, renderGaugeSVG, winePairingFor, winePairingReason, monthCardHTML, renderOverview, renderPlan, pickerPool, surpriseMe, renderPicker, renderBrowse, lastNameOf, renderBrowseBody, downloadMyData, addBook, addAlreadyReadBook, addNewBookToPlan, submitAddBook, buyWishlistBook, renderHowItWorks, recomputeLiveCatalog, liveScore, liveTier, renderAll, escHtml, escKey, buildPageHtml, initSeedAndTabs, reportColor, pct, round1, monthLabel, hBarChart, funnelChart, sparkBars, reportSection, computeReportData, renderReport];
 
 initSeedAndTabs();
 </script>
